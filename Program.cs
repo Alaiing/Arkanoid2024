@@ -1,3 +1,3 @@
 ﻿
-using var game = new Arkanoid2023.Arkanoid2024();
+using var game = new Arkanoid2024.Arkanoid2024();
 game.Run();

@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Arkanoid2023
+namespace Arkanoid2024
 {
     public class SpaceShip : Character
     {
@@ -26,15 +26,19 @@ namespace Arkanoid2023
         {
             base.Reset();
             _livesLeft = _startingLives;
+            ResetPosition();
+        }
+
+        public void ResetPosition()
+        {
             MoveTo(_defaultPosition);
         }
 
         public void LoseLife()
         {
-            _livesLeft--;
-            if ( _livesLeft < 0 )
+            if (!Arkanoid2024.CheatInfiniteLives)
             {
-                EventsManager.FireEvent("GameOver");
+                _livesLeft--;
             }
         }
 
@@ -61,9 +65,9 @@ namespace Arkanoid2023
             {
                 MoveTo(new Vector2(Arkanoid2024.PLAYGROUND_MIN_X - 2, Position.Y));
             }
-            else if (Position.X > Arkanoid2024.PLAYGROUND_MAX_X - 2 - _spriteSheet.FrameWidth)
+            else if (Position.X > Arkanoid2024.PLAYGROUND_MAX_X - _spriteSheet.FrameWidth)
             {
-                MoveTo(new Vector2(Arkanoid2024.PLAYGROUND_MAX_X - 2 - _spriteSheet.FrameWidth, Position.Y));
+                MoveTo(new Vector2(Arkanoid2024.PLAYGROUND_MAX_X - _spriteSheet.FrameWidth, Position.Y));
             }
         }
     }

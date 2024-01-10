@@ -42,15 +42,27 @@ namespace Oudidon
             _colors = new Color[_spriteSheet.LayerCount];
             _finalColors = new Color[_colors.Length];
             Reset();
+            ResetColors();
             Enabled = true;
             Visible = true;
+        }
+
+        public void Activate()
+        {
+            Enabled = true;
+            Visible = true;
+        }
+
+        public void Deactivate()
+        {
+            Enabled = false;
+            Visible = false;
         }
 
         public virtual void Reset()
         {
             _currentScale = Vector2.One;
             _currentFrame = 0;
-            ResetColors();
             LookTo(new Vector2(1, 0));
             MoveDirection = Vector2.Zero;
             _animationSpeedMultiplier = 1f;

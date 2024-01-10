@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Arkanoid2023
+namespace Arkanoid2024
 {
     public class Ball : Character
     {
@@ -43,7 +43,7 @@ namespace Arkanoid2023
         public void Unstick()
         {
             _stuck = false;
-            MoveDirection = new Vector2(_stuckX + _spriteSheet.FrameWidth /2 < _spaceShip.SpriteSheet.FrameWidth / 2 ? -1 : 1, -2);
+            MoveDirection = new Vector2(_stuckX + _spriteSheet.FrameWidth / 2 < _spaceShip.SpriteSheet.FrameWidth / 2 ? -1 : 1, -2);
             SetSpeedMultiplier(1f);
         }
 
@@ -60,24 +60,24 @@ namespace Arkanoid2023
 
             if (_stuck)
             {
-                MoveTo(_spaceShip.Position + new Vector2(_stuckX, -_spriteSheet.FrameHeight));
+                MoveTo(_spaceShip.Position + new Vector2(_stuckX + SpriteSheet.LeftMargin, -SpriteSheet.BottomMargin));
                 return;
             }
 
             if (Position.X > Arkanoid2024.PLAYGROUND_MAX_X - _spriteSheet.RightMargin)
             {
                 MoveDirection = new Vector2(-MoveDirection.X, MoveDirection.Y);
-                MoveTo(new Vector2(Arkanoid2024.PLAYGROUND_MAX_X - _spriteSheet.RightMargin, Position.Y));
-            } 
-            else if (Position.X < Arkanoid2024.PLAYGROUND_MIN_X)
+                MoveTo(new Vector2(Arkanoid2024.PLAYGROUND_MAX_X - SpriteSheet.RightMargin, Position.Y));
+            }
+            else if (Position.X < Arkanoid2024.PLAYGROUND_MIN_X + SpriteSheet.LeftMargin)
             {
                 MoveDirection = new Vector2(-MoveDirection.X, MoveDirection.Y);
-                MoveTo(new Vector2(Arkanoid2024.PLAYGROUND_MIN_X, Position.Y));
+                MoveTo(new Vector2(Arkanoid2024.PLAYGROUND_MIN_X + SpriteSheet.LeftMargin, Position.Y));
             }
 
-            if (Position.Y > Arkanoid2024.PLAYGROUND_MAX_Y - _spriteSheet.BottomMargin)
+            if (Position.Y + SpriteSheet.BottomMargin > Arkanoid2024.PLAYGROUND_MAX_Y - _spriteSheet.BottomMargin)
             {
-                if (Position.X + SpriteSheet.FrameWidth / 2 >= _spaceShip.Position.X && Position.X + SpriteSheet.FrameWidth / 2 <= _spaceShip.Position.X + _spaceShip.SpriteSheet.FrameWidth)
+                if (Position.X + SpriteSheet.RightMargin >= _spaceShip.Position.X && Position.X - SpriteSheet.LeftMargin <= _spaceShip.Position.X + _spaceShip.SpriteSheet.FrameWidth)
                 {
                     int offset = PixelPositionX - _spaceShip.PixelPositionX;
                     if (MoveDirection.X > 0 && offset < _spaceShip.SpriteSheet.FrameWidth / 2
@@ -89,19 +89,70 @@ namespace Arkanoid2023
                     {
                         MoveDirection = new Vector2(MoveDirection.X, -MoveDirection.Y);
                     }
-                    MoveTo(new Vector2(Position.X, Arkanoid2024.PLAYGROUND_MAX_Y - _spriteSheet.BottomMargin));
+                    MoveTo(new Vector2(Position.X, Arkanoid2024.PLAYGROUND_MAX_Y - SpriteSheet.BottomMargin));
+                    EventsManager.FireEvent("Ping");
                 }
                 else
                 {
-                    EventsManager.FireEvent("BallOut");
+                    if (Arkanoid2024.CheatNoBallOut)
+                    {
+                        MoveDirection = new Vector2(MoveDirection.X, -MoveDirection.Y);
+                    }
+                    else
+                    {
+                        EventsManager.FireEvent("BallOut");
+                    }
                 }
             }
-            else if (Position.Y < Arkanoid2024.PLAYGROUND_MIN_Y)
+            else if (Position.Y - SpriteSheet.TopMargin < Arkanoid2024.PLAYGROUND_MIN_Y)
             {
                 MoveDirection = new Vector2(MoveDirection.X, -MoveDirection.Y);
-                MoveTo(new Vector2(Position.X, Arkanoid2024.PLAYGROUND_MIN_Y));
+                MoveTo(new Vector2(Position.X, Arkanoid2024.PLAYGROUND_MIN_Y + SpriteSheet.TopMargin));
             }
         }
 
+
+        public void TestBrickCollision(Level level)
+        {
+            int x = PixelPositionX - Arkanoid2024.PLAYGROUND_MIN_X + (MoveDirection.X > 0 ? SpriteSheet.RightMargin + 1 : -SpriteSheet.LeftMargin - 1);
+            int y = PixelPositionY - Arkanoid2024.PLAYGROUND_MIN_Y + (MoveDirection.Y > 0 ? SpriteSheet.BottomMargin + 1 : -SpriteSheet.TopMargin - 1);
+
+            int testedGridX = (PixelPositionX - Arkanoid2024.PLAYGROUND_MIN_X) / 8;
+            int testedGridY = y / 8;
+
+            bool brickHit = false;
+
+            if (TestBrick(level, testedGridX, testedGridY))
+            {
+                MoveDirection = new Vector2(MoveDirection.X, -MoveDirection.Y);
+                brickHit = true;
+                EventsManager.FireEvent("BrickHit", new Point(testedGridX, testedGridY));
+            }
+
+            testedGridX = x / 8;
+            testedGridY = (PixelPositionY - Arkanoid2024.PLAYGROUND_MIN_Y) / 8;
+
+            if (TestBrick(level, testedGridX, testedGridY))
+            {
+                MoveDirection = new Vector2(-MoveDirection.X, MoveDirection.Y);
+                if (!brickHit)
+                {
+                    EventsManager.FireEvent("BrickHit", new Point(testedGridX, testedGridY));
+                }
+            }
+        }
+
+        private bool TestBrick(Level level, int x, int y)
+        {
+            if (x < Arkanoid2024.GRID_WIDTH && y < Arkanoid2024.GRID_HEIGHT)
+            {
+                Brick brick = level.GetBrick(x, y);
+                if (brick != null && brick.Visible)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 }
