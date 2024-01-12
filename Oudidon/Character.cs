@@ -1,7 +1,9 @@
-﻿using Microsoft.Xna.Framework;
+﻿using Arkanoid2024;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Oudidon
 {
@@ -45,6 +47,11 @@ namespace Oudidon
             ResetColors();
             Enabled = true;
             Visible = true;
+        }
+
+        public Rectangle GetBounds()
+        {
+            return new Rectangle(PixelPositionX - SpriteSheet.LeftMargin, PixelPositionY - SpriteSheet.TopMargin, SpriteSheet.FrameWidth, SpriteSheet.FrameHeight);
         }
 
         public void Activate()

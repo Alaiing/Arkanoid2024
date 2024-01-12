@@ -24,6 +24,12 @@ namespace Arkanoid2024
         private const string STATE_GAME = "Game";
         private const string STATE_GAME_OVER = "GameOver";
 
+        private readonly Vector2[] _spawnPositions = new Vector2[]
+        {
+            new Vector2(36 + 32, 27 + 10),
+            new Vector2(36 + 92, 27 + 10)
+        };
+
         private SpriteSheet _shipSprite;
         private SpaceShip _ship;
 
@@ -31,6 +37,8 @@ namespace Arkanoid2024
         private Ball _ball;
 
         private Texture2D _frame;
+        private SpriteSheet _hatch;
+        private Character[] _hatches;
         private Texture2D _background_1;
         private Texture2D _life;
         private Texture2D _logo;
@@ -39,6 +47,8 @@ namespace Arkanoid2024
         private SpriteSheet _basicBrick;
         private SpriteSheet _silverBrick;
         private SpriteSheet _goldenBrick;
+
+        private SpriteSheet _enemyHat;
 
         private List<Level> _levels = new();
         private int _currentLevelIndex;
@@ -55,7 +65,9 @@ namespace Arkanoid2024
 
         public const bool CheatInfiniteLives = false;
         public const bool CheatNoBallOut = false;
-        public const int CheatStartingLevel = 1;
+        public const int CheatStartingLevel = 0;
+
+        private List<Enemy> _enemies = new List<Enemy>();
 
         protected override void Initialize()
         {
@@ -70,7 +82,7 @@ namespace Arkanoid2024
 
             _stateMachine.AddState(STATE_TITLE, OnEnter: TitleEnter, OnUpdate: TitleUpdate, OnDraw: TitleDraw);
             _stateMachine.AddState(STATE_LEVEL_START, OnUpdate: LevelStartUpdate, OnDraw: LevelStartDraw);
-            _stateMachine.AddState(STATE_GAME, OnEnter: GameEnter, OnExit: GameExit, OnDraw: GameDraw);
+            _stateMachine.AddState(STATE_GAME, OnEnter: GameEnter, OnExit: GameExit, OnUpdate: GameUpdate, OnDraw: GameDraw);
             _stateMachine.AddState(STATE_GAME_OVER);
 
             _currentLevelIndex = CheatStartingLevel;
@@ -86,6 +98,22 @@ namespace Arkanoid2024
             _life = Content.Load<Texture2D>("life");
             _logo = Content.Load<Texture2D>("logo");
             _levelStart = Content.Load<Texture2D>("level_start");
+
+            _hatches = new Character[2];
+            _hatch = new SpriteSheet(Content, "hatch", 20, 9, Point.Zero);
+            _hatch.RegisterAnimation("Idle", 0, 0, 1f);
+            _hatch.RegisterAnimation("Open", 0, 2, 8f);
+            _hatches[0] = new Character(_hatch, this);
+            _hatches[0].SetAnimation("Idle");
+            _hatches[0].MoveTo(new Vector2(36 + 22, 27));
+            Components.Add(_hatches[0]);
+            _hatches[0].Deactivate();
+
+            _hatches[1] = new Character(_hatch, this);
+            _hatches[1].SetAnimation("Idle");
+            _hatches[1].MoveTo(new Vector2(36 + 82, 27));
+            Components.Add(_hatches[1]);
+            _hatches[1].Deactivate();
 
             _shipSprite = new SpriteSheet(Content, "spaceship", 18, 6, Point.Zero);
             _shipSprite.RegisterAnimation("Idle", 0, 0, 1f);
@@ -112,7 +140,10 @@ namespace Arkanoid2024
             _goldenBrick = new SpriteSheet(Content, "silver_brick", 8, 8, Point.Zero);
             _goldenBrick.RegisterAnimation("Idle", 0, 0, 1f);
 
-            _levels.Add(new Level("level1.data", _basicBrick, _silverBrick, _goldenBrick, this));
+            _enemyHat = new SpriteSheet(Content, "hat", 9, 14, new Point(4,0));
+            _enemyHat.RegisterAnimation("Idle", 0, 12, 10f);
+
+            _levels.Add(new Level("test_level.data", _basicBrick, _silverBrick, _goldenBrick, this));
             _levels.Add(new Level("level2.data", _basicBrick, _silverBrick, _goldenBrick, this));
 
             _ping = Content.Load<SoundEffect>("ping");
@@ -275,6 +306,9 @@ namespace Arkanoid2024
             _ball.Activate();
             _ball.Reset();
             _ball.StickToSpaceShip(DEFAULT_STICK_X);
+            _hatches[0].Activate();
+            _hatches[1].Activate();
+            _enemySpawnCooldown = 0;
         }
 
         private void GameExit()
@@ -282,6 +316,24 @@ namespace Arkanoid2024
             _ship.Deactivate();
             _ball.Deactivate();
             _levels[_currentLevelIndex].DeActivate();
+            _hatches[0].Deactivate();
+            _hatches[1].Deactivate();
+            RemoveAllEnemies();
+        }
+
+        private float _enemySpawnCooldown;
+        private void GameUpdate(GameTime gameTime, float stateTime)
+        {
+            if (_enemies.Count < 3)
+            {
+                _enemySpawnCooldown += (float)gameTime.ElapsedGameTime.TotalSeconds;
+                if (_enemySpawnCooldown >= 2f)
+                {
+                    int hatchSide = CommonRandom.Random.Next(0, 2);
+                    SpawnEnemy(hatchSide);
+                    _enemySpawnCooldown = 0;
+                }
+            }
         }
 
         private void GameDraw(SpriteBatch batch, GameTime time)
@@ -290,6 +342,43 @@ namespace Arkanoid2024
             DrawLives();
         }
 
+        #endregion
+
+        #region Enemies
+        private void SpawnEnemy(int hatchIndex)
+        {
+            Vector2 position = _spawnPositions[hatchIndex];
+            Enemy newEnemy = new Enemy(_enemyHat, _levels[_currentLevelIndex], _enemies, this);
+            newEnemy.MoveTo(position);
+            newEnemy.SetAnimation("Idle");
+            _enemies.Add(newEnemy);
+            Components.Add(newEnemy);
+
+            _hatches[hatchIndex].SetAnimation("Open", () => _hatches[hatchIndex].SetAnimation("Idle"));
+        }
+
+        private void RemoveAllEnemies()
+        {
+            foreach(Enemy enemy in _enemies) 
+            { 
+                Components.Remove(enemy);
+                enemy.Dispose();
+            }
+            _enemies.Clear();
+        }
+
+        public static bool TestCollision(Character character, Character other)
+        {
+            return OverlapsWith(character.GetBounds(), other.GetBounds());
+        }
+
+        public static bool OverlapsWith(Rectangle first, Rectangle second)
+        {
+            return !(first.Bottom < second.Top 
+                    || first.Right < second.Left 
+                    || first.Top > second.Bottom 
+                    || first.Left > second.Right);
+        }
         #endregion
     }
 }

@@ -19,7 +19,7 @@ namespace Arkanoid2024
         {        
             _defaultPosition = new Vector2(68, Arkanoid2024.PLAYGROUND_MAX_Y);
             _startingLives = ConfigManager.GetConfig("STARTING_LIVES", 4);
-            SetBaseSpeed(100f);
+            SetBaseSpeed(200f);
         }
 
         public override void Reset()

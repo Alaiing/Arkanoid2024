@@ -18,10 +18,15 @@ namespace Arkanoid2024
         private Vector2 _previousPosition;
         public Vector2 PreviousPosition => _previousPosition;
 
+        private int _speedX;
+        private int _speedY;
+
         public Ball(SpriteSheet spriteSheet, SpaceShip spaceShip, Game game) : base(spriteSheet, game)
         {
             _spaceShip = spaceShip;
-            SetBaseSpeed(80f);
+            SetBaseSpeed(50f);
+            _speedX = 1;
+            _speedY = 3;
             DrawOrder = 1;
         }
 
@@ -29,7 +34,7 @@ namespace Arkanoid2024
         {
             base.Reset();
             MoveTo(new Vector2(96, 177));
-            MoveDirection = new Vector2(1, -2);
+            MoveDirection = new Vector2(_speedX, -_speedY);
             SetSpeedMultiplier(1f);
         }
 
@@ -43,7 +48,7 @@ namespace Arkanoid2024
         public void Unstick()
         {
             _stuck = false;
-            MoveDirection = new Vector2(_stuckX + _spriteSheet.FrameWidth / 2 < _spaceShip.SpriteSheet.FrameWidth / 2 ? -1 : 1, -2);
+            MoveDirection = new Vector2((_stuckX + _spriteSheet.FrameWidth / 2 < _spaceShip.SpriteSheet.FrameWidth / 2 ? -1 : 1) * _speedX, - _speedY);
             SetSpeedMultiplier(1f);
         }
 
@@ -75,7 +80,7 @@ namespace Arkanoid2024
                 MoveTo(new Vector2(Arkanoid2024.PLAYGROUND_MIN_X + SpriteSheet.LeftMargin, Position.Y));
             }
 
-            if (Position.Y + SpriteSheet.BottomMargin > Arkanoid2024.PLAYGROUND_MAX_Y - _spriteSheet.BottomMargin)
+            if (MoveDirection.Y > 0 && Position.Y + SpriteSheet.BottomMargin > Arkanoid2024.PLAYGROUND_MAX_Y - _spriteSheet.BottomMargin)
             {
                 if (Position.X + SpriteSheet.RightMargin >= _spaceShip.Position.X && Position.X - SpriteSheet.LeftMargin <= _spaceShip.Position.X + _spaceShip.SpriteSheet.FrameWidth)
                 {

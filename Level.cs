@@ -23,6 +23,10 @@ namespace Arkanoid2024
         };
 
         private Brick[,] _bricks;
+        private int _width, _height;
+        public int Width => _width;
+        public int Height => _height;
+
         private SpriteSheet _basicBrickSheet;
         private SpriteSheet _silverBrickSheet;
         private SpriteSheet _goldenBrickSheet;
@@ -33,7 +37,9 @@ namespace Arkanoid2024
 
         public Level(string levelAsset, SpriteSheet basicBrick, SpriteSheet silverBrick, SpriteSheet goldenBrick, OudidonGame game)
         {
-            _bricks = new Brick[Arkanoid2024.GRID_WIDTH, Arkanoid2024.GRID_HEIGHT];
+            _width = Arkanoid2024.GRID_WIDTH;
+            _height = Arkanoid2024.GRID_HEIGHT;
+            _bricks = new Brick[_width, _height];
             _game = game;
             _basicBrickSheet = basicBrick;
             _silverBrickSheet = silverBrick;
@@ -43,6 +49,9 @@ namespace Arkanoid2024
 
         public Brick GetBrick(int x, int y)
         {
+            if (x < 0 || y < 0 || x >= _width || y >= _height)
+                return null;
+
             return _bricks[x, y];
         }
 
