@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework.Input;
 using Oudidon;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Arkanoid2024
 {
@@ -15,7 +16,7 @@ namespace Arkanoid2024
         public const int PLAYGROUND_MAX_X = 150;
         public const int PLAYGROUND_MIN_Y = 38;
         public const int PLAYGROUND_MAX_Y = 251;
-        public const int DEFAULT_STICK_X = 8;
+        public const int DEFAULT_STICK_X = 9;
         public const int GRID_WIDTH = 13;
         public const int GRID_HEIGHT = 18;
 
@@ -34,7 +35,7 @@ namespace Arkanoid2024
         private SpaceShip _ship;
 
         private SpriteSheet _ballSprite;
-        private Ball _ball;
+        private List<Ball> _balls = new();
 
         private Texture2D _frame;
         private SpriteSheet _hatch;
@@ -43,12 +44,15 @@ namespace Arkanoid2024
         private Texture2D _life;
         private Texture2D _logo;
         private Texture2D _levelStart;
+        private Texture2D _gameOver;
 
         private SpriteSheet _basicBrick;
         private SpriteSheet _silverBrick;
         private SpriteSheet _goldenBrick;
 
         private SpriteSheet _enemyHat;
+
+        private SpriteSheet _bonusSheet;
 
         private List<Level> _levels = new();
         private int _currentLevelIndex;
@@ -68,6 +72,11 @@ namespace Arkanoid2024
         public const int CheatStartingLevel = 0;
 
         private List<Enemy> _enemies = new List<Enemy>();
+        private SpriteSheet _explosionSheet;
+        private Stack<Character> _explosionsStack = new();
+
+        private int _bonusStack;
+        private List<Bonus> _activeBonuses = new List<Bonus>();
 
         protected override void Initialize()
         {
@@ -75,15 +84,17 @@ namespace Arkanoid2024
 
             base.Initialize();
 
-            EventsManager.ListenTo("BallOut", OnBallOut);
+            EventsManager.ListenTo<Ball>("BallOut", OnBallOut);
             EventsManager.ListenTo("Ping", OnPing);
             EventsManager.ListenTo<Point>("BrickHit", OnBrickHit);
             EventsManager.ListenTo<Brick>("BrickDestroyed", OnBrickDestroyed);
+            EventsManager.ListenTo<Enemy>("EnemyHit", OnEnemyHit);
+            EventsManager.ListenTo("Multibaaaaall", OnDisrupt);
 
             _stateMachine.AddState(STATE_TITLE, OnEnter: TitleEnter, OnUpdate: TitleUpdate, OnDraw: TitleDraw);
             _stateMachine.AddState(STATE_LEVEL_START, OnUpdate: LevelStartUpdate, OnDraw: LevelStartDraw);
             _stateMachine.AddState(STATE_GAME, OnEnter: GameEnter, OnExit: GameExit, OnUpdate: GameUpdate, OnDraw: GameDraw);
-            _stateMachine.AddState(STATE_GAME_OVER);
+            _stateMachine.AddState(STATE_GAME_OVER, OnUpdate: GameOverUpdate, OnDraw: GameOverDraw);
 
             _currentLevelIndex = CheatStartingLevel;
             SetState(STATE_TITLE);
@@ -98,6 +109,7 @@ namespace Arkanoid2024
             _life = Content.Load<Texture2D>("life");
             _logo = Content.Load<Texture2D>("logo");
             _levelStart = Content.Load<Texture2D>("level_start");
+            _gameOver = Content.Load<Texture2D>("game_over");
 
             _hatches = new Character[2];
             _hatch = new SpriteSheet(Content, "hatch", 20, 9, Point.Zero);
@@ -115,19 +127,20 @@ namespace Arkanoid2024
             Components.Add(_hatches[1]);
             _hatches[1].Deactivate();
 
-            _shipSprite = new SpriteSheet(Content, "spaceship", 18, 6, Point.Zero);
-            _shipSprite.RegisterAnimation("Idle", 0, 0, 1f);
-            _ship = new SpaceShip(_shipSprite, this);
-            _ship.SetAnimation("Idle");
+            SpriteSheet laserBlast = new SpriteSheet(Content, "laser_blast", 14, 6, Point.Zero);
+            laserBlast.RegisterAnimation("Idle", 0, 0, 1f);
+            _shipSprite = new SpriteSheet(Content, "spaceship", 22, 8, new Point(11, 0));
+            _shipSprite.RegisterAnimation(SpaceShip.DEFAULT, 0, 0, 1f);
+            _shipSprite.RegisterAnimation(SpaceShip.EXTENDED, 1, 1, 1f);
+            _shipSprite.RegisterAnimation(SpaceShip.LASER, 2, 2, 1f);
+            _ship = new SpaceShip(_shipSprite, laserBlast, this);
             Components.Add(_ship);
             _ship.Deactivate();
 
             _ballSprite = new SpriteSheet(Content, "ball", 4, 4, new Point(2, 2));
             _ballSprite.RegisterAnimation("Idle", 0, 0, 1f);
-            _ball = new Ball(_ballSprite, _ship, this);
-            _ball.SetAnimation("Idle");
-            Components.Add(_ball);
-            _ball.Deactivate();
+            AddBall();
+            _balls[0].Deactivate();
 
             _basicBrick = new SpriteSheet(Content, "basic_brick", 8, 8, Point.Zero);
             _basicBrick.RegisterAnimation("Idle", 0, 0, 1f);
@@ -140,11 +153,24 @@ namespace Arkanoid2024
             _goldenBrick = new SpriteSheet(Content, "silver_brick", 8, 8, Point.Zero);
             _goldenBrick.RegisterAnimation("Idle", 0, 0, 1f);
 
-            _enemyHat = new SpriteSheet(Content, "hat", 9, 14, new Point(4,0));
+            _enemyHat = new SpriteSheet(Content, "hat", 9, 14, new Point(4, 0));
             _enemyHat.RegisterAnimation("Idle", 0, 12, 10f);
 
-            _levels.Add(new Level("test_level.data", _basicBrick, _silverBrick, _goldenBrick, this));
+            _bonusSheet = new SpriteSheet(Content, "bonuses", 8, 7, Point.Zero);
+            _bonusSheet.RegisterAnimation(SlowBonus.SLOW_BONUS, 0, 3, 4f);
+            _bonusSheet.RegisterAnimation(CatchBonus.CATCH_BONUS, 4, 7, 4f);
+            _bonusSheet.RegisterAnimation(ExtendedBonus.EXTENDED_BONUS, 8, 11, 4f);
+            _bonusSheet.RegisterAnimation(DisruptBonus.DISRUPT_BONUS, 12, 15, 4f);
+            _bonusSheet.RegisterAnimation("Laser", 16, 19, 4f);
+            _bonusSheet.RegisterAnimation("Breakout", 20, 23, 4f);
+            _bonusSheet.RegisterAnimation("Player", 24, 27, 4f);
+
+            _levels.Add(new Level("level1.data", _basicBrick, _silverBrick, _goldenBrick, this));
             _levels.Add(new Level("level2.data", _basicBrick, _silverBrick, _goldenBrick, this));
+
+            _explosionSheet = new SpriteSheet(Content, "explosion", 12, 14, Point.Zero);
+            _explosionSheet.RegisterAnimation("Explode", 0, 4, 10f);
+
 
             _ping = Content.Load<SoundEffect>("ping");
             _pingInstance = _ping.CreateInstance();
@@ -162,11 +188,6 @@ namespace Arkanoid2024
             // TODO: Add your update logic here
 
             base.Update(gameTime); // Updates state machine and components, in that order
-
-            if (!_ball.IsStuck && _ball.Enabled)
-            {
-                _ball.TestBrickCollision(_levels[_currentLevelIndex]);
-            }
         }
 
         protected override void DrawGameplay(GameTime gameTime)
@@ -205,10 +226,59 @@ namespace Arkanoid2024
             _levels[_currentLevelIndex].Reset();
         }
 
-        #region Events
-        private void OnBallOut()
+        private void SpawnExplosion(Vector2 position)
         {
-            _ball.StickToSpaceShip(DEFAULT_STICK_X);
+            Character explosion;
+            if (_explosionsStack.Count > 0)
+            {
+                explosion = _explosionsStack.Pop();
+            }
+            else
+            {
+                explosion = new Character(_explosionSheet, this);
+                explosion.Deactivate();
+                explosion.SetAnimation("Explode", onAnimationEnd: () => DisposeExplosion(explosion));
+                Components.Add(explosion);
+            }
+
+            explosion.SetFrame(0);
+            explosion.Activate();
+            explosion.MoveTo(position);
+        }
+
+        private void DisposeExplosion(Character explosion)
+        {
+            explosion.Deactivate();
+            _explosionsStack.Push(explosion);
+        }
+
+        private void AddBall()
+        {
+            Ball newBall = new Ball(_ballSprite, _ship, this);
+            _balls.Add(newBall);
+            Components.Add(newBall);
+        }
+
+        private void ClearBalls()
+        {
+            if (_balls.Count > 1)
+            {
+                _balls.RemoveRange(1, _balls.Count);
+            }
+        }
+
+        #region Events
+        private void OnBallOut(Ball ball)
+        {
+            if (_balls.Count > 1)
+            {
+                ball.Deactivate();
+                Components.Remove(ball);
+                _balls.Remove(ball);
+                ball.Dispose();
+                return;
+            }
+
             _ship.LoseLife();
             if (_ship.LivesLeft >= 0)
             {
@@ -216,7 +286,7 @@ namespace Arkanoid2024
             }
             else
             {
-                SetState(STATE_TITLE);
+                SetState(STATE_GAME_OVER);
             }
         }
 
@@ -258,8 +328,46 @@ namespace Arkanoid2024
                 {
                     // TODO: end game
                 }
+                return;
+            }
+
+            if (brick.IsRegular && _balls.Count < 2 && Bonus.CurrentFallingBonus == null)
+            {
+                _bonusStack += CommonRandom.Random.Next(1, 9);
+                if (_bonusStack >= 1)
+                {
+                    SpawnBonus(brick);
+                    _bonusStack = 0;
+                }
             }
         }
+
+        private void SpawnBonus(Brick brick)
+        {
+            new LaserBonus(brick.Position + new Vector2(0, brick.SpriteSheet.BottomMargin), _bonusSheet, this);
+        }
+
+        private void OnEnemyHit(Enemy enemy)
+        {
+            SpawnExplosion(enemy.Position - enemy.SpriteSheet.DefaultPivot.ToVector2());
+            _enemies.Remove(enemy);
+            enemy.Kill();
+        }
+
+        private void OnDisrupt()
+        {
+            AddBall();
+            AddBall();
+
+            _balls[0].SetSpeedY(1);
+            for (int i = 1; i < _balls.Count; i++)
+            {
+                _balls[i].MoveTo(_balls[0].Position);
+                _balls[i].MoveDirection = _balls[0].MoveDirection;
+                _balls[i].SetSpeedY(i + 1);
+            }
+        }
+
         #endregion
 
         #region States
@@ -303,22 +411,26 @@ namespace Arkanoid2024
             _levels[_currentLevelIndex].Activate();
             _ship.Activate();
             _ship.ResetPosition();
-            _ball.Activate();
-            _ball.Reset();
-            _ball.StickToSpaceShip(DEFAULT_STICK_X);
+            _ship.SetType(SpaceShip.SpaceShipType.Laser);
+            _balls[0].Activate();
+            _balls[0].Reset();
+            _balls[0].StickToSpaceShip(DEFAULT_STICK_X);
             _hatches[0].Activate();
             _hatches[1].Activate();
             _enemySpawnCooldown = 0;
+            _bonusStack = 0;
         }
 
         private void GameExit()
         {
             _ship.Deactivate();
-            _ball.Deactivate();
+            ClearBalls();
+            _balls[0].Deactivate();
             _levels[_currentLevelIndex].DeActivate();
             _hatches[0].Deactivate();
             _hatches[1].Deactivate();
             RemoveAllEnemies();
+            Bonus.ClearBonuses();
         }
 
         private float _enemySpawnCooldown;
@@ -334,6 +446,33 @@ namespace Arkanoid2024
                     _enemySpawnCooldown = 0;
                 }
             }
+
+            if (_balls.Count > 1 || !_balls[0].IsStuck && _balls[0].Enabled)
+            {
+                foreach (var ball in _balls)
+                {
+                    ball.TestBrickCollision(_levels[_currentLevelIndex]);
+                    ball.TestEnemiesCollision(_enemies);
+                }
+            }
+
+            for (int i = 0; i < _enemies.Count; i++)
+            {
+                if (TestCollision(_ship, _enemies[i]))
+                {
+                    EventsManager.FireEvent("EnemyHit", _enemies[i]);
+                }
+            }
+
+            if (Bonus.CurrentFallingBonus != null)
+            {
+                if (TestCollision(_ship, Bonus.CurrentFallingBonus))
+                {
+                    Bonus.CurrentFallingBonus.Collect(_ship, _balls[0]);
+                }
+            }
+
+            LaserBlast.TestCollisions(_levels[_currentLevelIndex], _enemies);
         }
 
         private void GameDraw(SpriteBatch batch, GameTime time)
@@ -341,6 +480,21 @@ namespace Arkanoid2024
             DrawBackround();
             DrawLives();
         }
+
+        private void GameOverUpdate(GameTime gameTime, float stateTime)
+        {
+            if (stateTime > 2f)
+            {
+                SetState(STATE_TITLE);
+            }
+        }
+
+        private void GameOverDraw(SpriteBatch batch, GameTime time)
+        {
+            batch.Draw(_gameOver, new Vector2(68, 144), Color.White);
+        }
+
+
 
         #endregion
 
@@ -359,8 +513,8 @@ namespace Arkanoid2024
 
         private void RemoveAllEnemies()
         {
-            foreach(Enemy enemy in _enemies) 
-            { 
+            foreach (Enemy enemy in _enemies)
+            {
                 Components.Remove(enemy);
                 enemy.Dispose();
             }
@@ -374,9 +528,9 @@ namespace Arkanoid2024
 
         public static bool OverlapsWith(Rectangle first, Rectangle second)
         {
-            return !(first.Bottom < second.Top 
-                    || first.Right < second.Left 
-                    || first.Top > second.Bottom 
+            return !(first.Bottom < second.Top
+                    || first.Right < second.Left
+                    || first.Top > second.Bottom
                     || first.Left > second.Right);
         }
         #endregion

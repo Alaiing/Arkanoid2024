@@ -255,7 +255,31 @@ namespace Oudidon
             return false;
         }
 
-        // TODO : pressed this frame for A
+        public static bool IsAPressedThisFrame(PlayerIndex playerNumber)
+        {
+            GamePadState previousGamePad;
+            GamePadState currentState;
+            if (playerNumber == PlayerIndex.One)
+            {
+                if (IsKeyPressedThisFrame(Keys.Space))
+                {
+                    return true;
+                }
+                previousGamePad = _gamePadPreviousStatePlayer1;
+                currentState = _gamePadStatePlayer1;
+            }
+            else
+            {
+                if (IsKeyPressedThisFrame(Keys.F))
+                {
+                    return true;
+                }
+                previousGamePad = _gamePadPreviousStatePlayer2;
+                currentState = _gamePadStatePlayer2;
+            }
+
+            return IsButtonPressedThisFrame(currentState, previousGamePad, Buttons.A);
+        }
 
         public static bool IsBDown(PlayerIndex playerNumber)
         {

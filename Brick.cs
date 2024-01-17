@@ -16,6 +16,7 @@ namespace Arkanoid2024
         private int _points;
         private int _health;
         private int _maxHealth;
+        public bool IsRegular => _maxHealth == 1;
 
         public bool IsDestroyed => _maxHealth > 0 && _health <= 0;
 

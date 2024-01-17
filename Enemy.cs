@@ -63,11 +63,16 @@ namespace Arkanoid2024
             if (Position.Y > Arkanoid2024.PLAYGROUND_MAX_Y)
             {
                 _allEnemies.Remove(this);
-                Deactivate();
-                Dispose();
+                Kill();
             }
         }
 
+        public void Kill()
+        {
+            Game.Components.Remove(this);
+            Deactivate();
+            Dispose();
+        }
 
         private void StraightEnter()
         {
