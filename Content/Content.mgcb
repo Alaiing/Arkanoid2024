@@ -85,6 +85,12 @@
 /processorParam:TextureFormat=Color
 /build:frame.png
 
+#begin game_over_jingle.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:game_over_jingle.wav
+
 #begin game_over.png
 /importer:TextureImporter
 /processor:TextureProcessor
@@ -96,6 +102,12 @@
 /processorParam:MakeSquare=False
 /processorParam:TextureFormat=Color
 /build:game_over.png
+
+#begin game_start.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:game_start.wav
 
 #begin hat.png
 /importer:TextureImporter
@@ -145,6 +157,12 @@
 /processorParam:TextureFormat=Color
 /build:level_start.png
 
+#begin level_start.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:level_start.wav;level_start_jingle.wav
+
 #begin life.png
 /importer:TextureImporter
 /processor:TextureProcessor
@@ -181,6 +199,12 @@
 /processorParam:Quality=Best
 /build:ping.wav
 
+#begin pioupioupioupioupioupioupiou.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:pioupioupioupioupioupioupiou.wav
+
 #begin pong.wav
 /importer:WavImporter
 /processor:SoundEffectProcessor
@@ -210,4 +234,16 @@
 /processorParam:MakeSquare=False
 /processorParam:TextureFormat=Color
 /build:spaceship.png
+
+#begin tchoutchoutchou.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:tchoutchoutchou.wav
+
+#begin zboui.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:zboui.wav
 

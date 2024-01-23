@@ -10,9 +10,9 @@ namespace Arkanoid2024
 {
     public class DisruptBonus : Bonus
     {
-        public const string DISRUPT_BONUS = "Disrupt";
+        public const string ANIMATION_NAME = "Disrupt";
 
-        protected override string _animationName => DISRUPT_BONUS;
+        protected override string _animationName => ANIMATION_NAME;
         
         public DisruptBonus(Vector2 position, SpriteSheet spriteSheet, Game game) : base(position, spriteSheet, game)
         {
@@ -25,6 +25,7 @@ namespace Arkanoid2024
             {
                 ball.Unstick();
             }
+            ship.SetType(SpaceShip.SpaceShipType.Default);
 
             EventsManager.FireEvent("Multibaaaaall");
             base.Collect(ship, ball);

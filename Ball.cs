@@ -54,8 +54,8 @@ namespace Arkanoid2024
         public void Unstick()
         {
             _stuck = false;
-            MoveDirection = new Vector2((_stuckX + _spriteSheet.FrameWidth / 2 < _spaceShip.SpriteSheet.FrameWidth / 2 ? -1 : 1) * _speedX, -_speedY);
             SetSpeedMultiplier(1f);
+            EventsManager.FireEvent("Ping");
         }
 
         public void SetSpeedY(int speedY)
@@ -79,7 +79,7 @@ namespace Arkanoid2024
                 }
                 else
                 {
-                    MoveTo(_spaceShip.Position + new Vector2(_stuckX + SpriteSheet.LeftMargin - _spaceShip.Size / 2, -SpriteSheet.BottomMargin));
+                    MoveTo(_spaceShip.Position + new Vector2(_stuckX, -SpriteSheet.BottomMargin));
                     return;
                 }
             }
@@ -87,7 +87,7 @@ namespace Arkanoid2024
             if (Position.X > Arkanoid2024.PLAYGROUND_MAX_X - _spriteSheet.RightMargin - 2)
             {
                 MoveDirection = new Vector2(-MoveDirection.X, MoveDirection.Y);
-                MoveTo(new Vector2(Arkanoid2024.PLAYGROUND_MAX_X - SpriteSheet.RightMargin - 2 , Position.Y));
+                MoveTo(new Vector2(Arkanoid2024.PLAYGROUND_MAX_X - SpriteSheet.RightMargin - 2, Position.Y));
             }
             else if (Position.X < Arkanoid2024.PLAYGROUND_MIN_X + SpriteSheet.LeftMargin)
             {
@@ -97,8 +97,8 @@ namespace Arkanoid2024
 
             if (MoveDirection.Y > 0 && Position.Y + SpriteSheet.BottomMargin > Arkanoid2024.PLAYGROUND_MAX_Y)
             {
-                if (Position.X + SpriteSheet.RightMargin >= _spaceShip.Position.X - _spaceShip.Size / 2 
-                    && Position.X - SpriteSheet.LeftMargin <= _spaceShip.Position.X + _spaceShip.Size /2)
+                if (Position.X + SpriteSheet.RightMargin >= _spaceShip.Position.X - _spaceShip.Size / 2
+                    && Position.X - SpriteSheet.LeftMargin <= _spaceShip.Position.X + _spaceShip.Size / 2)
                 {
                     int offset = PixelPositionX - _spaceShip.PixelPositionX;
                     if (MoveDirection.X > 0 && offset < 0
@@ -135,52 +135,48 @@ namespace Arkanoid2024
                 MoveTo(new Vector2(Position.X, Arkanoid2024.PLAYGROUND_MIN_Y + SpriteSheet.TopMargin));
             }
         }
-
-
         public void TestBrickCollision(Level level)
         {
-            int x = PixelPositionX - Arkanoid2024.PLAYGROUND_MIN_X + (MoveDirection.X > 0 ? SpriteSheet.RightMargin + 1 : -SpriteSheet.LeftMargin - 1);
-            int y = PixelPositionY - Arkanoid2024.PLAYGROUND_MIN_Y + (MoveDirection.Y > 0 ? SpriteSheet.BottomMargin + 1 : -SpriteSheet.TopMargin - 1);
+            float x = Position.X + (MoveDirection.X > 0 ? SpriteSheet.RightMargin + 1 : -SpriteSheet.LeftMargin - 1);
+            float y = Position.Y + (MoveDirection.Y > 0 ? SpriteSheet.BottomMargin + 1 : -SpriteSheet.TopMargin - 1);
 
-            int testedGridX = (PixelPositionX - Arkanoid2024.PLAYGROUND_MIN_X) / 8;
-            int testedGridY = y / 8;
+            Vector2 testedPosition = new Vector2(PixelPositionX, y);
 
             bool brickHit = false;
 
-            if (TestBrick(level, testedGridX, testedGridY))
+            if (Arkanoid2024.TestBrick(level, testedPosition, out Point gridPosition))
             {
                 MoveDirection = new Vector2(MoveDirection.X, -MoveDirection.Y);
                 brickHit = true;
-                EventsManager.FireEvent("BrickHit", new Point(testedGridX, testedGridY));
+                EventsManager.FireEvent("BrickHit", gridPosition);
             }
 
-            testedGridX = x / 8;
-            testedGridY = (PixelPositionY - Arkanoid2024.PLAYGROUND_MIN_Y) / 8;
+            testedPosition = new Vector2(x, PixelPositionY);
 
-            if (TestBrick(level, testedGridX, testedGridY))
+            if (Arkanoid2024.TestBrick(level, testedPosition, out gridPosition))
             {
                 MoveDirection = new Vector2(-MoveDirection.X, MoveDirection.Y);
                 if (!brickHit)
                 {
-                    EventsManager.FireEvent("BrickHit", new Point(testedGridX, testedGridY));
+                    EventsManager.FireEvent("BrickHit", gridPosition);
                 }
             }
         }
 
         public void TestEnemiesCollision(List<Enemy> enemies)
         {
-            int x = PixelPositionX + (MoveDirection.X > 0 ? SpriteSheet.RightMargin + 1 : -SpriteSheet.LeftMargin - 1);
-            int y = PixelPositionY + (MoveDirection.Y > 0 ? SpriteSheet.BottomMargin + 1 : -SpriteSheet.TopMargin - 1);
+            float x = Position.X + (MoveDirection.X > 0 ? SpriteSheet.RightMargin + 1 : -SpriteSheet.LeftMargin - 1);
+            float y = Position.Y + (MoveDirection.Y > 0 ? SpriteSheet.BottomMargin + 1 : -SpriteSheet.TopMargin - 1);
 
             for (int i = 0; i < enemies.Count; i++)
             {
                 Enemy enemy = enemies[i];
                 if (enemy.Visible)
                 {
-                    int testedX = PixelPositionX;
-                    int testedY = y;
+                    float testedX = PixelPositionX;
+                    float testedY = y;
 
-                    if (TestEnemyCollision(enemy, testedX, testedY))
+                    if (TestEnemyCollision(enemy, new Vector2(testedX, testedY)))
                     {
                         MoveDirection = new Vector2(MoveDirection.X, -MoveDirection.Y);
                         EventsManager.FireEvent("EnemyHit", enemy);
@@ -189,7 +185,7 @@ namespace Arkanoid2024
                     testedX = x;
                     testedY = PixelPositionY;
 
-                    if (TestEnemyCollision(enemy, testedX, testedY))
+                    if (TestEnemyCollision(enemy, new Vector2(testedX, testedY)))
                     {
                         MoveDirection = new Vector2(-MoveDirection.X, MoveDirection.Y);
                         EventsManager.FireEvent("EnemyHit", enemy);
@@ -198,23 +194,35 @@ namespace Arkanoid2024
             }
         }
 
-        private bool TestBrick(Level level, int x, int y)
-        {
-            if (x < Arkanoid2024.GRID_WIDTH && y < Arkanoid2024.GRID_HEIGHT)
-            {
-                Brick brick = level.GetBrick(x, y);
-                if (brick != null && brick.Visible)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private bool TestEnemyCollision(Enemy enemy, int x, int y)
+        private bool TestEnemyCollision(Enemy enemy, Vector2 position)
         {
             Rectangle bounds = enemy.GetBounds();
-            return bounds.Contains(x, y);
+            return bounds.Contains(position);
+        }
+
+        public bool TestBonusCollision()
+        {
+            if (Bonus.CurrentFallingBonus == null)
+                return false;
+
+            float x = Position.X + (MoveDirection.X > 0 ? SpriteSheet.RightMargin + 1 : -SpriteSheet.LeftMargin - 1);
+            float y = Position.Y + (MoveDirection.Y > 0 ? SpriteSheet.BottomMargin + 1 : -SpriteSheet.TopMargin - 1);
+
+            Vector2 testedPosition = new Vector2(PixelPositionX, y);
+
+            //if (Bonus.CurrentFallingBonus.GetBounds().Contains(testedPosition))
+            //{
+            //    MoveDirection = new Vector2(MoveDirection.X, -MoveDirection.Y);
+            //}
+
+            testedPosition = new Vector2(x, PixelPositionY);
+
+            if (Bonus.CurrentFallingBonus.GetBounds().Contains(testedPosition))
+            {
+                MoveDirection = new Vector2(-MoveDirection.X, MoveDirection.Y);
+            }
+
+            return false;
         }
     }
 }

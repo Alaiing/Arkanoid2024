@@ -10,9 +10,9 @@ namespace Arkanoid2024
 {
     public class SlowBonus : Bonus
     {
-        public const string SLOW_BONUS = "Slow";
+        public new const string ANIMATION_NAME = "Slow";
 
-        protected override string _animationName => SLOW_BONUS;
+        protected override string _animationName => ANIMATION_NAME;
 
         public SlowBonus(Vector2 position, SpriteSheet spriteSheet, Game game) : base(position, spriteSheet, game)
         {

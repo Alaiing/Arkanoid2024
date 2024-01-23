@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Oudidon;
 using System;
 using System.Collections.Generic;
@@ -30,13 +31,20 @@ namespace Arkanoid2024
 
         private SpriteSheet _laserBlastSprite;
 
+        private SoundEffect _laserBlastSound;
+        private SoundEffectInstance _laserBlastSoundInstance;
+
         public SpaceShip(SpriteSheet spriteSheet, SpriteSheet laserBlastSprite, Game game) : base(spriteSheet, game)        
         {        
             _laserBlastSprite = laserBlastSprite;
             _defaultPosition = new Vector2(68, Arkanoid2024.PLAYGROUND_MAX_Y);
             _startingLives = ConfigManager.GetConfig("STARTING_LIVES", 4);
             SetBaseSpeed(200f);
+
+            _laserBlastSound = Game.Content.Load<SoundEffect>("pioupioupioupioupioupioupiou");
+            _laserBlastSoundInstance = _laserBlastSound.CreateInstance();
         }
+
 
         public override void Reset()
         {
@@ -60,7 +68,7 @@ namespace Arkanoid2024
 
         public void IncreaseLife()
         {
-            _livesLeft = Math.Min(10, _livesLeft + 1);
+            _livesLeft++;
         }
 
         public void SetType(SpaceShipType spaceShipType)
@@ -103,7 +111,9 @@ namespace Arkanoid2024
 
             if (_type == SpaceShipType.Laser && SimpleControls.IsAPressedThisFrame(PlayerIndex.One))
             {
-                new LaserBlast(Position + new Vector2(-_size / 2 + 2, - _laserBlastSprite.BottomMargin), _laserBlastSprite, Game);
+                new LaserBlast(Position + new Vector2(-_size / 2 + 2, - _laserBlastSprite.BottomMargin), _laserBlastSoundInstance, _laserBlastSprite, Game);
+                _laserBlastSoundInstance.Stop();
+                _laserBlastSoundInstance.Play();
             }
 
             base.Update(gameTime);

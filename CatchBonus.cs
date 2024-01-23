@@ -10,8 +10,9 @@ namespace Arkanoid2024
 {
     public class CatchBonus : Bonus
     {
-        public const string CATCH_BONUS = "Catch";
-        protected override string _animationName => CATCH_BONUS;
+        public new const string ANIMATION_NAME = "Catch";
+
+        protected override string _animationName => ANIMATION_NAME;
 
         public CatchBonus(Vector2 position, SpriteSheet spriteSheet, Game game) : base(position, spriteSheet, game) { }
 

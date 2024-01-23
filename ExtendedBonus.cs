@@ -10,9 +10,9 @@ namespace Arkanoid2024
 {
     public class ExtendedBonus : Bonus
     {
-        public const string EXTENDED_BONUS = "Extended";
+        public new const string ANIMATION_NAME = "Extended";
 
-        protected override string _animationName => EXTENDED_BONUS;
+        protected override string _animationName => ANIMATION_NAME;
 
         public ExtendedBonus(Vector2 position, SpriteSheet spriteSheet, Game game) : base(position, spriteSheet, game)
         {

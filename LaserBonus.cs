@@ -10,9 +10,9 @@ namespace Arkanoid2024
 {
     public class LaserBonus : Bonus
     {
-        public const string LASER_BONUS = "Laser";
+        public new const string ANIMATION_NAME = "Laser";
 
-        protected override string _animationName => LASER_BONUS;
+        protected override string _animationName => ANIMATION_NAME;
 
         public LaserBonus(Vector2 position, SpriteSheet spriteSheet, Game game) : base(position, spriteSheet, game)
         {

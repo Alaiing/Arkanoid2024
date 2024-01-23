@@ -6,6 +6,7 @@ using Oudidon;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace Arkanoid2024
 {
@@ -16,12 +17,13 @@ namespace Arkanoid2024
         public const int PLAYGROUND_MAX_X = 150;
         public const int PLAYGROUND_MIN_Y = 38;
         public const int PLAYGROUND_MAX_Y = 251;
-        public const int DEFAULT_STICK_X = 9;
+        public const int DEFAULT_STICK_X = 1;
         public const int GRID_WIDTH = 13;
         public const int GRID_HEIGHT = 18;
 
         private const string STATE_TITLE = "Title";
         private const string STATE_LEVEL_START = "LevelStart";
+        private const string STATE_BALL_OUT = "BallOut";
         private const string STATE_GAME = "Game";
         private const string STATE_GAME_OVER = "GameOver";
 
@@ -67,6 +69,21 @@ namespace Arkanoid2024
         private SoundEffect _pang;
         private SoundEffectInstance _pangInstance;
 
+        private SoundEffect _ballOut;
+        private SoundEffectInstance _ballOutInstance;
+
+        private SoundEffect _enemyDie;
+        private SoundEffectInstance _enemyDieInstance;
+
+        private SoundEffect _gameLaunchJingle;
+        private SoundEffectInstance _gameLaunchJingleInstance;
+
+        private SoundEffect _levelStartJingle;
+        private SoundEffectInstance _levelStartJingleInstance;
+        
+        private SoundEffect _gameOverJingle;
+        private SoundEffectInstance _gameOverJingleInstance;
+
         public const bool CheatInfiniteLives = false;
         public const bool CheatNoBallOut = false;
         public const int CheatStartingLevel = 0;
@@ -76,7 +93,8 @@ namespace Arkanoid2024
         private Stack<Character> _explosionsStack = new();
 
         private int _bonusStack;
-        private List<Bonus> _activeBonuses = new List<Bonus>();
+        private List<Type> _bonusTypes = new();
+
 
         protected override void Initialize()
         {
@@ -92,9 +110,10 @@ namespace Arkanoid2024
             EventsManager.ListenTo("Multibaaaaall", OnDisrupt);
 
             _stateMachine.AddState(STATE_TITLE, OnEnter: TitleEnter, OnUpdate: TitleUpdate, OnDraw: TitleDraw);
-            _stateMachine.AddState(STATE_LEVEL_START, OnUpdate: LevelStartUpdate, OnDraw: LevelStartDraw);
-            _stateMachine.AddState(STATE_GAME, OnEnter: GameEnter, OnExit: GameExit, OnUpdate: GameUpdate, OnDraw: GameDraw);
-            _stateMachine.AddState(STATE_GAME_OVER, OnUpdate: GameOverUpdate, OnDraw: GameOverDraw);
+            _stateMachine.AddState(STATE_LEVEL_START, OnEnter: LevelStartEnter, OnUpdate: LevelStartUpdate, OnDraw: LevelStartDraw);
+            _stateMachine.AddState(STATE_GAME, OnEnter: GameEnter, OnUpdate: GameUpdate, OnDraw: GameDraw);
+            _stateMachine.AddState(STATE_BALL_OUT, OnEnter: BallOutEnter, OnExit: BallOutExit, OnUpdate: BallOutUpdate, OnDraw: GameDraw);
+            _stateMachine.AddState(STATE_GAME_OVER, OnEnter: GameOverEnter, OnUpdate: GameOverUpdate, OnDraw: GameOverDraw);
 
             _currentLevelIndex = CheatStartingLevel;
             SetState(STATE_TITLE);
@@ -157,13 +176,19 @@ namespace Arkanoid2024
             _enemyHat.RegisterAnimation("Idle", 0, 12, 10f);
 
             _bonusSheet = new SpriteSheet(Content, "bonuses", 8, 7, Point.Zero);
-            _bonusSheet.RegisterAnimation(SlowBonus.SLOW_BONUS, 0, 3, 4f);
-            _bonusSheet.RegisterAnimation(CatchBonus.CATCH_BONUS, 4, 7, 4f);
-            _bonusSheet.RegisterAnimation(ExtendedBonus.EXTENDED_BONUS, 8, 11, 4f);
-            _bonusSheet.RegisterAnimation(DisruptBonus.DISRUPT_BONUS, 12, 15, 4f);
-            _bonusSheet.RegisterAnimation("Laser", 16, 19, 4f);
+            _bonusSheet.RegisterAnimation(SlowBonus.ANIMATION_NAME, 0, 3, 4f);
+            _bonusTypes.Add(typeof(SlowBonus));
+            _bonusSheet.RegisterAnimation(CatchBonus.ANIMATION_NAME, 4, 7, 4f);
+            _bonusTypes.Add(typeof(CatchBonus));
+            _bonusSheet.RegisterAnimation(ExtendedBonus.ANIMATION_NAME, 8, 11, 4f);
+            _bonusTypes.Add(typeof(ExtendedBonus));
+            _bonusSheet.RegisterAnimation(DisruptBonus.ANIMATION_NAME, 12, 15, 4f);
+            _bonusTypes.Add(typeof(DisruptBonus));
+            _bonusSheet.RegisterAnimation(LaserBonus.ANIMATION_NAME, 16, 19, 4f);
+            _bonusTypes.Add(typeof(LaserBonus));
+            _bonusSheet.RegisterAnimation(ExtraLifeBonus.ANIMATION_NAME, 24, 27, 4f);
+            _bonusTypes.Add(typeof(ExtraLifeBonus));
             _bonusSheet.RegisterAnimation("Breakout", 20, 23, 4f);
-            _bonusSheet.RegisterAnimation("Player", 24, 27, 4f);
 
             _levels.Add(new Level("level1.data", _basicBrick, _silverBrick, _goldenBrick, this));
             _levels.Add(new Level("level2.data", _basicBrick, _silverBrick, _goldenBrick, this));
@@ -178,6 +203,21 @@ namespace Arkanoid2024
             _pongInstance = _pong.CreateInstance();
             _pang = Content.Load<SoundEffect>("pang");
             _pangInstance = _pang.CreateInstance();
+
+            _ballOut = Content.Load<SoundEffect>("tchoutchoutchou");
+            _ballOutInstance = _ballOut.CreateInstance();
+
+            _enemyDie = Content.Load<SoundEffect>("zboui");
+            _enemyDieInstance = _enemyDie.CreateInstance();
+
+            _gameLaunchJingle = Content.Load<SoundEffect>("game_start");
+            _gameLaunchJingleInstance = _gameLaunchJingle.CreateInstance();
+
+            _levelStartJingle = Content.Load<SoundEffect>("level_start_jingle");
+            _levelStartJingleInstance = _levelStartJingle.CreateInstance();
+
+            _gameOverJingle = Content.Load<SoundEffect>("game_over_jingle");
+            _gameOverJingleInstance = _gameOverJingle.CreateInstance();
         }
 
         protected override void Update(GameTime gameTime)
@@ -214,7 +254,7 @@ namespace Arkanoid2024
 
         private void DrawLives()
         {
-            for (int i = 0; i < _ship.LivesLeft; i++)
+            for (int i = 0; i < Math.Min(10, _ship.LivesLeft); i++)
             {
                 _spriteBatch.Draw(_life, new Vector2(42 + _life.Width * i, 261), Color.White);
             }
@@ -267,6 +307,24 @@ namespace Arkanoid2024
             }
         }
 
+        public static bool TestBrick(Level level, Vector2 position, out Point gridPosition)
+        {
+            int testedGridX = (int)MathF.Floor(position.X - PLAYGROUND_MIN_X - 2) / 8;
+            int testedGridY = (int)MathF.Floor(position.Y - PLAYGROUND_MIN_Y) / 8;
+            gridPosition = new Point(testedGridX, testedGridY);
+
+            if (testedGridX < GRID_WIDTH && testedGridY < GRID_HEIGHT)
+            {
+                Brick brick = level.GetBrick(testedGridX, testedGridY);
+                if (brick != null && brick.Visible)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+
         #region Events
         private void OnBallOut(Ball ball)
         {
@@ -280,14 +338,7 @@ namespace Arkanoid2024
             }
 
             _ship.LoseLife();
-            if (_ship.LivesLeft >= 0)
-            {
-                SetState(STATE_LEVEL_START);
-            }
-            else
-            {
-                SetState(STATE_GAME_OVER);
-            }
+            SetState(STATE_BALL_OUT);
         }
 
         private void OnPing()
@@ -334,7 +385,7 @@ namespace Arkanoid2024
             if (brick.IsRegular && _balls.Count < 2 && Bonus.CurrentFallingBonus == null)
             {
                 _bonusStack += CommonRandom.Random.Next(1, 9);
-                if (_bonusStack >= 1)
+                if (_bonusStack >= 8)
                 {
                     SpawnBonus(brick);
                     _bonusStack = 0;
@@ -344,7 +395,9 @@ namespace Arkanoid2024
 
         private void SpawnBonus(Brick brick)
         {
-            new LaserBonus(brick.Position + new Vector2(0, brick.SpriteSheet.BottomMargin), _bonusSheet, this);
+            int index = CommonRandom.Random.Next(0, _bonusTypes.Count);
+            ConstructorInfo ctor = _bonusTypes[index].GetConstructor(new Type[] { typeof(Vector2), typeof(SpriteSheet), typeof(Game)});
+            ctor.Invoke(new object[] { brick.Position + new Vector2(0, brick.SpriteSheet.BottomMargin), _bonusSheet, this} );
         }
 
         private void OnEnemyHit(Enemy enemy)
@@ -352,6 +405,9 @@ namespace Arkanoid2024
             SpawnExplosion(enemy.Position - enemy.SpriteSheet.DefaultPivot.ToVector2());
             _enemies.Remove(enemy);
             enemy.Kill();
+
+            _enemyDieInstance.Stop();
+            _enemyDieInstance.Play();
         }
 
         private void OnDisrupt()
@@ -383,14 +439,32 @@ namespace Arkanoid2024
             batch.Draw(_logo, new Vector2(32, 11), Color.White);
         }
 
+        private bool _gameStarting;
         private void TitleUpdate(GameTime time, float arg2)
         {
             SimpleControls.GetStates();
-            if (SimpleControls.IsADown(PlayerIndex.One))
+            if (!_gameStarting)
             {
-                SetState(STATE_LEVEL_START);
-                SetCurrentLevel(CheatStartingLevel);
+                if (SimpleControls.IsAPressedThisFrame(PlayerIndex.One))
+                {
+                    _gameLaunchJingleInstance.Play();
+                    _gameStarting = true;
+                }
             }
+            else
+            {
+                if (_gameLaunchJingleInstance.State != SoundState.Playing)
+                {
+                    SetState(STATE_LEVEL_START);
+                    SetCurrentLevel(CheatStartingLevel);
+                    _gameStarting = false;
+                }
+            }
+        }
+
+        private void LevelStartEnter()
+        {
+            _levelStartJingleInstance.Play();
         }
 
         private void LevelStartDraw(SpriteBatch batch, GameTime time)
@@ -400,7 +474,7 @@ namespace Arkanoid2024
 
         private void LevelStartUpdate(GameTime time, float stateTime)
         {
-            if (stateTime > 1f)
+            if (stateTime > _levelStartJingle.Duration.TotalSeconds)
             {
                 SetState(STATE_GAME);
             }
@@ -411,7 +485,7 @@ namespace Arkanoid2024
             _levels[_currentLevelIndex].Activate();
             _ship.Activate();
             _ship.ResetPosition();
-            _ship.SetType(SpaceShip.SpaceShipType.Laser);
+            _ship.SetType(SpaceShip.SpaceShipType.Default);
             _balls[0].Activate();
             _balls[0].Reset();
             _balls[0].StickToSpaceShip(DEFAULT_STICK_X);
@@ -419,18 +493,6 @@ namespace Arkanoid2024
             _hatches[1].Activate();
             _enemySpawnCooldown = 0;
             _bonusStack = 0;
-        }
-
-        private void GameExit()
-        {
-            _ship.Deactivate();
-            ClearBalls();
-            _balls[0].Deactivate();
-            _levels[_currentLevelIndex].DeActivate();
-            _hatches[0].Deactivate();
-            _hatches[1].Deactivate();
-            RemoveAllEnemies();
-            Bonus.ClearBonuses();
         }
 
         private float _enemySpawnCooldown;
@@ -453,6 +515,7 @@ namespace Arkanoid2024
                 {
                     ball.TestBrickCollision(_levels[_currentLevelIndex]);
                     ball.TestEnemiesCollision(_enemies);
+                    ball.TestBonusCollision();
                 }
             }
 
@@ -481,9 +544,59 @@ namespace Arkanoid2024
             DrawLives();
         }
 
+        private void BallOutEnter()
+        {
+            _ballOutInstance.Play();
+            _ship.Enabled = false;
+            foreach (var ball in _balls)
+            {
+                ball.Enabled = false;
+            }
+            _hatches[0].Enabled = false;
+            _hatches[1].Enabled = false;
+            if (Bonus.CurrentFallingBonus != null)
+                Bonus.CurrentFallingBonus.Enabled = false;
+            foreach(Enemy enemy in _enemies)
+            {
+                enemy.Enabled = false;
+            }
+        }
+
+        private void BallOutExit()
+        {
+            _ship.Deactivate();
+            ClearBalls();
+            _balls[0].Deactivate();
+            _levels[_currentLevelIndex].DeActivate();
+            _hatches[0].Deactivate();
+            _hatches[1].Deactivate();
+            RemoveAllEnemies();
+            Bonus.ClearBonuses();
+        }
+
+        private void BallOutUpdate(GameTime gameTime, float stateTime)
+        {
+            if (stateTime >= _ballOut.Duration.TotalSeconds)
+            {
+                if (_ship.LivesLeft >= 0)
+                {
+                    SetState(STATE_LEVEL_START);
+                }
+                else
+                {
+                    SetState(STATE_GAME_OVER);
+                }
+            }
+        }
+
+        private void GameOverEnter()
+        {
+            _gameOverJingleInstance.Play();
+        }
+
         private void GameOverUpdate(GameTime gameTime, float stateTime)
         {
-            if (stateTime > 2f)
+            if (stateTime > _gameOverJingle.Duration.TotalSeconds)
             {
                 SetState(STATE_TITLE);
             }
