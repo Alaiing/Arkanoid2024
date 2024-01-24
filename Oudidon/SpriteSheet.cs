@@ -230,5 +230,10 @@ namespace Oudidon
                 }
             }
         }
+
+        public Texture2D GetTexture(int layer = 0)
+        {
+            return _layers[layer];
+        }
     }
 }

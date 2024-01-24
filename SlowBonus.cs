@@ -10,7 +10,7 @@ namespace Arkanoid2024
 {
     public class SlowBonus : Bonus
     {
-        public new const string ANIMATION_NAME = "Slow";
+        public const string ANIMATION_NAME = "Slow";
 
         protected override string _animationName => ANIMATION_NAME;
 
@@ -22,6 +22,7 @@ namespace Arkanoid2024
         {
             ship.Sticky = false;
             ball.SetSpeedY(1);
+            ball.SetBrickHitCount(0);
             base.Collect(ship, ball);
         }
     }

@@ -22,9 +22,11 @@ namespace Arkanoid2024
         public const int GRID_HEIGHT = 18;
 
         private const string STATE_TITLE = "Title";
+        private const string STATE_INTRO = "Intro";
         private const string STATE_LEVEL_START = "LevelStart";
         private const string STATE_BALL_OUT = "BallOut";
         private const string STATE_GAME = "Game";
+        private const string STATE_SKIP_LEVEL = "SkipLevel";
         private const string STATE_GAME_OVER = "GameOver";
 
         private readonly Vector2[] _spawnPositions = new Vector2[]
@@ -39,14 +41,14 @@ namespace Arkanoid2024
         private SpriteSheet _ballSprite;
         private List<Ball> _balls = new();
 
+        private Breakout _breakout;
+
         private Texture2D _frame;
         private SpriteSheet _hatch;
         private Character[] _hatches;
         private Texture2D _background_1;
         private Texture2D _life;
         private Texture2D _logo;
-        private Texture2D _levelStart;
-        private Texture2D _gameOver;
 
         private SpriteSheet _basicBrick;
         private SpriteSheet _silverBrick;
@@ -84,9 +86,14 @@ namespace Arkanoid2024
         private SoundEffect _gameOverJingle;
         private SoundEffectInstance _gameOverJingleInstance;
 
-        public const bool CheatInfiniteLives = false;
-        public const bool CheatNoBallOut = false;
-        public const int CheatStartingLevel = 0;
+        private SoundEffect _introMusic;
+        private SoundEffectInstance _introMusicInstance;
+
+        private SoundEffect _introJingle;
+        private SoundEffectInstance _introJingleInstance;
+
+        private SoundEffect _breakoutSound;
+        private SoundEffectInstance _breakoutSoundInstance;
 
         private List<Enemy> _enemies = new List<Enemy>();
         private SpriteSheet _explosionSheet;
@@ -95,6 +102,14 @@ namespace Arkanoid2024
         private int _bonusStack;
         private List<Type> _bonusTypes = new();
 
+        private int _player1Score;
+        private int _player2Score;
+        private int _highscore;
+        private int _enemyPoints;
+
+        public const bool CheatInfiniteLives = false;
+        public const bool CheatNoBallOut = false;
+        public const int CheatStartingLevel = 0;
 
         protected override void Initialize()
         {
@@ -108,14 +123,20 @@ namespace Arkanoid2024
             EventsManager.ListenTo<Brick>("BrickDestroyed", OnBrickDestroyed);
             EventsManager.ListenTo<Enemy>("EnemyHit", OnEnemyHit);
             EventsManager.ListenTo("Multibaaaaall", OnDisrupt);
+            EventsManager.ListenTo("Breakout", OnBreakOut);
+            EventsManager.ListenTo("ShipBreakout", OnShipBreakout);
 
             _stateMachine.AddState(STATE_TITLE, OnEnter: TitleEnter, OnUpdate: TitleUpdate, OnDraw: TitleDraw);
+            _stateMachine.AddState(STATE_INTRO, OnEnter: IntroEnter, OnExit: IntroExit, OnUpdate: IntroUpdate, OnDraw: IntroDraw);
             _stateMachine.AddState(STATE_LEVEL_START, OnEnter: LevelStartEnter, OnUpdate: LevelStartUpdate, OnDraw: LevelStartDraw);
             _stateMachine.AddState(STATE_GAME, OnEnter: GameEnter, OnUpdate: GameUpdate, OnDraw: GameDraw);
+            _stateMachine.AddState(STATE_SKIP_LEVEL, OnEnter: SkipLevelEnter, OnUpdate: SkipLevelUpdate, OnDraw: GameDraw);
             _stateMachine.AddState(STATE_BALL_OUT, OnEnter: BallOutEnter, OnExit: BallOutExit, OnUpdate: BallOutUpdate, OnDraw: GameDraw);
             _stateMachine.AddState(STATE_GAME_OVER, OnEnter: GameOverEnter, OnUpdate: GameOverUpdate, OnDraw: GameOverDraw);
 
             _currentLevelIndex = CheatStartingLevel;
+            _enemyPoints = ConfigManager.GetConfig("ENEMY_POINTS", 100); ;
+
             SetState(STATE_TITLE);
         }
 
@@ -127,8 +148,6 @@ namespace Arkanoid2024
             _background_1 = Content.Load<Texture2D>("background1");
             _life = Content.Load<Texture2D>("life");
             _logo = Content.Load<Texture2D>("logo");
-            _levelStart = Content.Load<Texture2D>("level_start");
-            _gameOver = Content.Load<Texture2D>("game_over");
 
             _hatches = new Character[2];
             _hatch = new SpriteSheet(Content, "hatch", 20, 9, Point.Zero);
@@ -169,8 +188,9 @@ namespace Arkanoid2024
             _silverBrick.RegisterAnimation("Idle", 0, 0, 1f);
             _silverBrick.RegisterAnimation("Hit", 0, 2, 20f);
 
-            _goldenBrick = new SpriteSheet(Content, "silver_brick", 8, 8, Point.Zero);
+            _goldenBrick = new SpriteSheet(Content, "golden_brick", 8, 8, Point.Zero);
             _goldenBrick.RegisterAnimation("Idle", 0, 0, 1f);
+            _goldenBrick.RegisterAnimation("Hit", 0, 2, 20f);
 
             _enemyHat = new SpriteSheet(Content, "hat", 9, 14, new Point(4, 0));
             _enemyHat.RegisterAnimation("Idle", 0, 12, 10f);
@@ -188,14 +208,17 @@ namespace Arkanoid2024
             _bonusTypes.Add(typeof(LaserBonus));
             _bonusSheet.RegisterAnimation(ExtraLifeBonus.ANIMATION_NAME, 24, 27, 4f);
             _bonusTypes.Add(typeof(ExtraLifeBonus));
-            _bonusSheet.RegisterAnimation("Breakout", 20, 23, 4f);
-
-            _levels.Add(new Level("level1.data", _basicBrick, _silverBrick, _goldenBrick, this));
-            _levels.Add(new Level("level2.data", _basicBrick, _silverBrick, _goldenBrick, this));
+            _bonusSheet.RegisterAnimation(BreakOutBonus.ANIMATION_NAME, 20, 23, 4f);
+            _bonusTypes.Add(typeof(BreakOutBonus));
 
             _explosionSheet = new SpriteSheet(Content, "explosion", 12, 14, Point.Zero);
             _explosionSheet.RegisterAnimation("Explode", 0, 4, 10f);
 
+            SpriteSheet breakOutSheet = new SpriteSheet(Content, "breakout", 20, 30, Point.Zero);
+            _breakout = new Breakout(breakOutSheet, this);
+            _breakout.MoveTo(new Vector2(150, 231));
+            Components.Add(_breakout);
+            _breakout.Deactivate();
 
             _ping = Content.Load<SoundEffect>("ping");
             _pingInstance = _ping.CreateInstance();
@@ -203,6 +226,9 @@ namespace Arkanoid2024
             _pongInstance = _pong.CreateInstance();
             _pang = Content.Load<SoundEffect>("pang");
             _pangInstance = _pang.CreateInstance();
+
+            _breakoutSound = Content.Load<SoundEffect>("zioum");
+            _breakoutSoundInstance = _breakoutSound.CreateInstance();
 
             _ballOut = Content.Load<SoundEffect>("tchoutchoutchou");
             _ballOutInstance = _ballOut.CreateInstance();
@@ -218,6 +244,17 @@ namespace Arkanoid2024
 
             _gameOverJingle = Content.Load<SoundEffect>("game_over_jingle");
             _gameOverJingleInstance = _gameOverJingle.CreateInstance();
+
+            _introJingle = Content.Load<SoundEffect>("intro_jingle");
+            _introJingleInstance = _introJingle.CreateInstance();
+
+            _introMusic = Content.Load<SoundEffect>("intro");
+            _introMusicInstance = _introMusic.CreateInstance();
+
+            CreateSpriteFont();
+
+            _levels.Add(new Level("level1.data", 1, _basicBrick, _silverBrick, _goldenBrick, this));
+            _levels.Add(new Level("level2.data", 2, _basicBrick, _silverBrick, _goldenBrick, this));
         }
 
         protected override void Update(GameTime gameTime)
@@ -303,7 +340,7 @@ namespace Arkanoid2024
         {
             if (_balls.Count > 1)
             {
-                _balls.RemoveRange(1, _balls.Count);
+                _balls.RemoveRange(1, _balls.Count - 1);
             }
         }
 
@@ -324,6 +361,24 @@ namespace Arkanoid2024
             return false;
         }
 
+        SpriteFont _spriteFont;
+        private void CreateSpriteFont()
+        {
+            Texture2D fontTexture = Content.Load<Texture2D>("font");
+            List<Rectangle> glyphBounds = new List<Rectangle>();
+            List<Rectangle> cropping = new List<Rectangle>();
+            string charsString = " \".0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            List<char> chars = new List<char>();
+            chars.AddRange(charsString);
+            List<Vector3> kerning = new List<Vector3>();
+            for (int i = 0; i < fontTexture.Height / 8; i++)
+            {
+                glyphBounds.Add(new Rectangle(0, i*8, 6, 8));
+                cropping.Add(new Rectangle(0, 0, 12, 8));
+                kerning.Add(new Vector3(0, 6, 0));
+            }
+            _spriteFont = new SpriteFont(fontTexture, glyphBounds, cropping, chars, 0, 0, kerning, ' ');
+        }
 
         #region Events
         private void OnBallOut(Ball ball)
@@ -365,20 +420,15 @@ namespace Arkanoid2024
 
         private void OnBrickDestroyed(Brick brick)
         {
+            _player1Score += brick.Points;
+            if (_player1Score > _highscore) 
+            { 
+                _highscore = _player1Score;
+            }
             _currentBrickCount++;
             if (_currentBrickCount == _levels[_currentLevelIndex].BrickCount)
             {
-                if (_currentLevelIndex < _levels.Count - 1)
-                {
-                    _levels[_currentLevelIndex].DeActivate();
-                    SetCurrentLevel(_currentLevelIndex + 1);
-                    _currentBrickCount = 0;
-                    SetState(STATE_LEVEL_START);
-                }
-                else
-                {
-                    // TODO: end game
-                }
+                NextLevel();
                 return;
             }
 
@@ -390,6 +440,21 @@ namespace Arkanoid2024
                     SpawnBonus(brick);
                     _bonusStack = 0;
                 }
+            }
+        }
+
+        private void NextLevel()
+        {
+            if (_currentLevelIndex < _levels.Count - 1)
+            {
+                _levels[_currentLevelIndex].DeActivate();
+                SetCurrentLevel(_currentLevelIndex + 1);
+                _currentBrickCount = 0;
+                SetState(STATE_LEVEL_START);
+            }
+            else
+            {
+                SetState(STATE_GAME_OVER);
             }
         }
 
@@ -408,6 +473,8 @@ namespace Arkanoid2024
 
             _enemyDieInstance.Stop();
             _enemyDieInstance.Play();
+
+            _player1Score += _enemyPoints;
         }
 
         private void OnDisrupt()
@@ -421,6 +488,21 @@ namespace Arkanoid2024
                 _balls[i].MoveTo(_balls[0].Position);
                 _balls[i].MoveDirection = _balls[0].MoveDirection;
                 _balls[i].SetSpeedY(i + 1);
+                _balls[i].SetBrickHitCount(_balls[0].BrickHitCount);
+            }
+        }
+
+        private void OnBreakOut()
+        {
+            _breakout.Activate();
+        }
+
+        private void OnShipBreakout()
+        {
+            _breakout.Activate();
+            //if (_breakout.Enabled)
+            {
+                SetState(STATE_SKIP_LEVEL);
             }
         }
 
@@ -431,7 +513,10 @@ namespace Arkanoid2024
         {
             _currentLevelIndex = CheatStartingLevel;
             _currentBrickCount = 0;
+            _player1Score = _player2Score = 0;
             _ship.Reset();
+
+            _introJingleInstance.Play();
         }
 
         private void TitleDraw(SpriteBatch batch, GameTime time)
@@ -447,6 +532,7 @@ namespace Arkanoid2024
             {
                 if (SimpleControls.IsAPressedThisFrame(PlayerIndex.One))
                 {
+                    _introJingleInstance.Stop();
                     _gameLaunchJingleInstance.Play();
                     _gameStarting = true;
                 }
@@ -455,7 +541,7 @@ namespace Arkanoid2024
             {
                 if (_gameLaunchJingleInstance.State != SoundState.Playing)
                 {
-                    SetState(STATE_LEVEL_START);
+                    SetState(STATE_INTRO);
                     SetCurrentLevel(CheatStartingLevel);
                     _gameStarting = false;
                 }
@@ -465,11 +551,15 @@ namespace Arkanoid2024
         private void LevelStartEnter()
         {
             _levelStartJingleInstance.Play();
+            ClearLevel();
         }
 
         private void LevelStartDraw(SpriteBatch batch, GameTime time)
         {
-            batch.Draw(_levelStart, new Vector2(68, 136), Color.White);
+            batch.DrawString(_spriteFont, $"PLAYER {1}", new Vector2(68, 138), Color.White);
+            batch.DrawString(_spriteFont, $"ROUND {_currentLevelIndex + 1}", new Vector2(68, 154), Color.White);
+            batch.DrawString(_spriteFont, "READY", new Vector2(74, 170), Color.White);
+            DrawScores();
         }
 
         private void LevelStartUpdate(GameTime time, float stateTime)
@@ -542,11 +632,17 @@ namespace Arkanoid2024
         {
             DrawBackround();
             DrawLives();
+            DrawScores();
         }
 
         private void BallOutEnter()
         {
             _ballOutInstance.Play();
+            Freeze();
+        }
+
+        private void Freeze()
+        {
             _ship.Enabled = false;
             foreach (var ball in _balls)
             {
@@ -556,13 +652,18 @@ namespace Arkanoid2024
             _hatches[1].Enabled = false;
             if (Bonus.CurrentFallingBonus != null)
                 Bonus.CurrentFallingBonus.Enabled = false;
-            foreach(Enemy enemy in _enemies)
+            foreach (Enemy enemy in _enemies)
             {
                 enemy.Enabled = false;
             }
         }
 
         private void BallOutExit()
+        {
+            ClearLevel();
+        }
+
+        private void ClearLevel()
         {
             _ship.Deactivate();
             ClearBalls();
@@ -572,6 +673,7 @@ namespace Arkanoid2024
             _hatches[1].Deactivate();
             RemoveAllEnemies();
             Bonus.ClearBonuses();
+            _breakout.Deactivate();
         }
 
         private void BallOutUpdate(GameTime gameTime, float stateTime)
@@ -589,9 +691,42 @@ namespace Arkanoid2024
             }
         }
 
+        private Vector2 _shipBreakoutPosition;
+        private float _skipDuration = 2;
+        private int _remainingPoints;
+        private int _scoreOnBreakout;
+        private void SkipLevelUpdate(GameTime gameTime, float stateTime)
+        {
+            if (stateTime < _skipDuration / 2)
+            {
+                _ship.MoveTo(Vector2.Lerp(_shipBreakoutPosition, _shipBreakoutPosition + new Vector2(_ship.Size +1, 0), stateTime / (_skipDuration / 2)));
+            }
+            else
+            {
+                _player1Score = _scoreOnBreakout + (int)MathHelper.Lerp(0, _remainingPoints, (stateTime - _skipDuration / 2) / _skipDuration);
+            }
+
+            if (stateTime > 3f)
+            {
+                _player1Score = _scoreOnBreakout + _remainingPoints;
+                NextLevel();
+            }
+
+        }
+
+        private void SkipLevelEnter()
+        {
+            _shipBreakoutPosition = _ship.Position;
+            _remainingPoints = _levels[_currentLevelIndex].GetRemainingPoints();
+            _scoreOnBreakout = _player1Score;
+            _breakoutSoundInstance.Play();
+            Freeze();
+        }
+
         private void GameOverEnter()
         {
             _gameOverJingleInstance.Play();
+            ClearLevel();
         }
 
         private void GameOverUpdate(GameTime gameTime, float stateTime)
@@ -604,10 +739,56 @@ namespace Arkanoid2024
 
         private void GameOverDraw(SpriteBatch batch, GameTime time)
         {
-            batch.Draw(_gameOver, new Vector2(68, 144), Color.White);
+            DrawScores();
+            _spriteBatch.DrawString(_spriteFont, "GAME OVER", new Vector2(68, 144), Color.White);
         }
 
 
+        private void DrawScores()
+        {
+            _spriteBatch.DrawString(_spriteFont, "1UP  HIGHSCORE  2UP", new Vector2(37, 11), Color.White);
+            if(_player1Score > 0)
+            {
+                _spriteBatch.DrawString(_spriteFont, _player1Score.ToString().PadLeft(6), new Vector2(37, 19), Color.White);
+            }
+
+            if(_highscore > 0)
+            {
+                _spriteBatch.DrawString(_spriteFont, _player1Score.ToString().PadLeft(6), new Vector2(78, 19), Color.White);
+            }
+
+            if (_player2Score > 0)
+            {
+                _spriteBatch.DrawString(_spriteFont, _player2Score.ToString().PadLeft(6), new Vector2(120, 19), Color.White);
+            }
+        }
+
+        private Vector2 _textPosition;
+        private string _introText = "The area and time of this story is unknown... After the mothership \"ARKANOID\" was destroyed a space craft \"VAUS\" scrambled away from it. But only to be trapped in space warped by someone.....";
+        private void IntroDraw(SpriteBatch batch, GameTime time)
+        {
+            batch.DrawString(_spriteFont, _introText.ToUpper(), _textPosition, Color.White);
+        }
+
+        private void IntroUpdate(GameTime time, float stateTime)
+        {
+            _textPosition += new Vector2(-100 * (float)time.ElapsedGameTime.TotalSeconds, 0);
+            if (Math.Abs(_textPosition.X) > _introText.Length * 6)
+            {
+                SetState(STATE_LEVEL_START);
+            }
+        }
+
+        private void IntroExit()
+        {
+            _introMusicInstance.Stop();
+        }
+
+        private void IntroEnter()
+        {
+            _introMusicInstance.Play();
+            _textPosition = new Vector2(ScreenWidth, ScreenHeight /2);
+        }
 
         #endregion
 

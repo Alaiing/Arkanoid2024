@@ -125,6 +125,7 @@ namespace Arkanoid2024
             else if (Position.X + _size / 2 > Arkanoid2024.PLAYGROUND_MAX_X)
             {
                 MoveTo(new Vector2(Arkanoid2024.PLAYGROUND_MAX_X - _size / 2 , Position.Y));
+                EventsManager.FireEvent("ShipBreakout");
             }
         }
     }

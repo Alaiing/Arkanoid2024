@@ -22,6 +22,17 @@ namespace Arkanoid2024
             Color.White
         };
 
+        private int[] _brickPoints = new int[]
+        {
+            90,
+            120,
+            70,
+            110,
+            80,
+            60,
+            50
+        };
+
         private Brick[,] _bricks;
         private int _width, _height;
         public int Width => _width;
@@ -35,7 +46,7 @@ namespace Arkanoid2024
         private int _brickCount;
         public int BrickCount => _brickCount;
 
-        public Level(string levelAsset, SpriteSheet basicBrick, SpriteSheet silverBrick, SpriteSheet goldenBrick, OudidonGame game)
+        public Level(string levelAsset, int levelIndex, SpriteSheet basicBrick, SpriteSheet silverBrick, SpriteSheet goldenBrick, OudidonGame game)
         {
             _width = Arkanoid2024.GRID_WIDTH;
             _height = Arkanoid2024.GRID_HEIGHT;
@@ -44,7 +55,7 @@ namespace Arkanoid2024
             _basicBrickSheet = basicBrick;
             _silverBrickSheet = silverBrick;
             _goldenBrickSheet = goldenBrick;
-            Load(levelAsset);
+            Load(levelAsset, levelIndex);
         }
 
         public Brick GetBrick(int x, int y)
@@ -85,7 +96,7 @@ namespace Arkanoid2024
             }
         }
 
-        private void Load(string asset)
+        private void Load(string asset, int levelIndex)
         {
             if (System.IO.File.Exists(asset))
             {
@@ -104,14 +115,16 @@ namespace Arkanoid2024
                             switch (brickType)
                             {
                                 case Brick.BRICK_SILVER:
-                                    newBrick = new Brick(_silverBrickSheet, _game, maxHealth: 2, points: 50);
+                                    newBrick = new Brick(_silverBrickSheet, _game, maxHealth: 2 + (levelIndex / 8), points: 50);
+                                    _brickCount++;
                                     break;
                                 case Brick.BRICK_GOLDEN:
-                                    newBrick = new Brick(_goldenBrickSheet, _game, maxHealth: 0, points: 50);
+                                    newBrick = new Brick(_goldenBrickSheet, _game, maxHealth: 0, points: 0);
                                     break;
                                 default:
-                                    newBrick = new Brick(_basicBrickSheet, _game, maxHealth: 1, points: 50);
+                                    newBrick = new Brick(_basicBrickSheet, _game, maxHealth: 1, points: _brickPoints[brickType - 3]);
                                     color = _brickColors[brickType - 3];
+                                    _brickCount++;
                                     break;
                             }
 
@@ -120,7 +133,6 @@ namespace Arkanoid2024
                             newBrick.MoveTo(new Vector2(x * 8 + Arkanoid2024.PLAYGROUND_MIN_X + 2, y * 8 + Arkanoid2024.PLAYGROUND_MIN_Y));
 
                             _bricks[x, y] = newBrick;
-                            _brickCount++;
                         }
                         else
                         {
@@ -129,6 +141,21 @@ namespace Arkanoid2024
                     }
                 }
             }
+        }
+
+        public int GetRemainingPoints()
+        {
+            int points = 0;
+
+            foreach (Brick brick in _bricks)
+            {
+                if (brick != null && brick.Visible) 
+                {
+                    points += brick.Points;
+                }
+            }
+
+            return points;
         }
     }
 }

@@ -14,6 +14,7 @@ namespace Arkanoid2024
         public const int BRICK_GOLDEN = 2;
 
         private int _points;
+        public int Points => _points;
         private int _health;
         private int _maxHealth;
         public bool IsRegular => _maxHealth == 1;
@@ -36,20 +37,23 @@ namespace Arkanoid2024
 
         public void Hit()
         {
+            SetAnimation("Hit", () => SetAnimation("Idle"));
+
             if (_maxHealth > 0)
             {
                 _health--;
-                if (_health <= 0 )
+                if (_health <= 0)
                 {
-                    Visible = false;
-                    EventsManager.FireEvent("BrickDestroyed", this);
-                }
-                else
-                {
-                    SetAnimation("Hit", () => SetAnimation("Idle"));
+                    Kill();
                 }
             }
 
+        }
+
+        private void Kill()
+        {
+            Visible = false;
+            EventsManager.FireEvent("BrickDestroyed", this);
         }
     }
 }
