@@ -1,0 +1,17 @@
+﻿In order to add a level, create a file (i.e. "levelXX.data") and add it to the list in config.ini
+
+File format:
+1st line: enemy type 0-3
+Next 18 lines: brick (13 per line)
+
+Bricks :
+0 - No brick
+1 - Silver (50pts)
+2 - Gold (indestructable)
+3 - Red (90pts)
+4 - Yellow (120pts)
+5 - Cyan (70pts)
+6 - Purple (110pts)
+8 - Green (80pts)
+9 - Orange (60pts)
+A - White (50pts)

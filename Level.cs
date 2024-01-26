@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Transactions;
 
 namespace Arkanoid2024
 {
@@ -19,7 +20,8 @@ namespace Arkanoid2024
             new Color(128, 0, 128),
             new Color(0, 255, 0),
             new Color(255, 128, 0),
-            Color.White
+            Color.White,
+            Color.Blue
         };
 
         private int[] _brickPoints = new int[]
@@ -30,7 +32,8 @@ namespace Arkanoid2024
             110,
             80,
             60,
-            50
+            50,
+            100
         };
 
         private Brick[,] _bricks;
@@ -45,6 +48,9 @@ namespace Arkanoid2024
 
         private int _brickCount;
         public int BrickCount => _brickCount;
+
+        private int _enemySpriteSheetIndex;
+        public int EnemySpriteSheetIndex => _enemySpriteSheetIndex;
 
         public Level(string levelAsset, int levelIndex, SpriteSheet basicBrick, SpriteSheet silverBrick, SpriteSheet goldenBrick, OudidonGame game)
         {
@@ -102,7 +108,8 @@ namespace Arkanoid2024
             {
                 string[] lines = System.IO.File.ReadAllLines(asset);
                 _brickCount = 0;
-                for (int y = 0; y < lines.Length; y++)
+                _enemySpriteSheetIndex = int.Parse(lines[0]);
+                for (int y = 1; y < lines.Length; y++)
                 {
                     string line = lines[y];
                     for (int x = 0; x < line.Length; x++)
@@ -111,7 +118,7 @@ namespace Arkanoid2024
                         {
                             Brick newBrick;
                             Color color = Color.White;
-                            int brickType = int.Parse(line[x].ToString());
+                            int brickType = int.Parse(line[x].ToString(),System.Globalization.NumberStyles.HexNumber);
                             switch (brickType)
                             {
                                 case Brick.BRICK_SILVER:
@@ -130,13 +137,13 @@ namespace Arkanoid2024
 
                             newBrick.Reset();
                             newBrick.SetColors(new Color[] { color });
-                            newBrick.MoveTo(new Vector2(x * 8 + Arkanoid2024.PLAYGROUND_MIN_X + 2, y * 8 + Arkanoid2024.PLAYGROUND_MIN_Y));
+                            newBrick.MoveTo(new Vector2(x * 8 + Arkanoid2024.PLAYGROUND_MIN_X + 2, (y - 1) * 8 + Arkanoid2024.PLAYGROUND_MIN_Y));
 
-                            _bricks[x, y] = newBrick;
+                            _bricks[x, y - 1] = newBrick;
                         }
                         else
                         {
-                            _bricks[x, y] = null;
+                            _bricks[x, y - 1] = null;
                         }
                     }
                 }
@@ -149,7 +156,7 @@ namespace Arkanoid2024
 
             foreach (Brick brick in _bricks)
             {
-                if (brick != null && brick.Visible) 
+                if (brick != null && brick.Visible)
                 {
                     points += brick.Points;
                 }

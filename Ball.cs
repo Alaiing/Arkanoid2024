@@ -10,7 +10,7 @@ namespace Arkanoid2024
 {
     public class Ball : Character
     {
-        private const int BRICK_COUNT_THRESHOLD = 8;
+        private int _bricksForAcceleration = 8;
 
         private SpaceShip _spaceShip;
         private bool _stuck;
@@ -36,6 +36,7 @@ namespace Arkanoid2024
             _defaultSpeedY = _speedY = ConfigManager.GetConfig("BALL_DEFAULT_SPEED_Y", 3);
             DrawOrder = 1;
             SetAnimation("Idle");
+            _bricksForAcceleration = ConfigManager.GetConfig("BRICKS_FOR_ACCELERATION", 8);
     }
 
     public void SetBrickHitCount(int brickHitCount)
@@ -246,7 +247,7 @@ namespace Arkanoid2024
 
         private void UpdateSpeed()
         {
-            SetSpeedMultiplier(1f + MathF.Min(1f, (_brickHitCount / BRICK_COUNT_THRESHOLD) * 0.1f));
+            SetSpeedMultiplier(1f + MathF.Min(1f, (_brickHitCount / _bricksForAcceleration) * 0.1f));
         }
     }
 }
